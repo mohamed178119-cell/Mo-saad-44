@@ -8,6 +8,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: build-apk
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -85,11 +89,24 @@ jobs:
           }
           EOG
 
+      - name: Resources check
+        run: |
+          df -h /
+          free -m
+          du -sh "$APP_DIR/public/models" 2>/dev/null || echo "النماذج غير مدمجة (هتتنزّل عند أول استخدام)"
+
+      - name: Give Gradle more memory
+        working-directory: ${{ env.APP_DIR }}/android
+        run: |
+          echo "org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m" >> gradle.properties
+          echo "org.gradle.workers.max=2" >> gradle.properties
+          echo "org.gradle.parallel=false" >> gradle.properties
+
       - name: Build APK
         working-directory: ${{ env.APP_DIR }}/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --console=plain --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
